@@ -39,9 +39,13 @@ const SPECIFIC_PATTERNS = [
 
 /** Check if text contains numbers (not just years) */
 function containsNumbers(text: string): boolean {
-  // Match numbers that aren't 4-digit years standing alone
-  const numbers = text.match(/\b\d+\b/g) ?? [];
-  return numbers.some((n) => n.length !== 4 || numbers.length > 1);
+  const plainNumbers = text.match(/\b\d+\b/g) ?? [];
+  const hasPlainNumbers = plainNumbers.some(
+    (n) => n.length !== 4 || plainNumbers.length > 1,
+  );
+  const hasMonetary = /[\$€£]\d|[\d.]+[KkMmBb]\b/.test(text);
+  const hasQuarter = /\bQ[1-4]\b/i.test(text);
+  return hasPlainNumbers || hasMonetary || hasQuarter;
 }
 
 /** Check for likely proper nouns (capitalized words not at sentence start) */

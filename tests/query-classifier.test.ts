@@ -24,6 +24,21 @@ describe("analyzeQuerySignals", () => {
     expect(signals.hasNumbers).toBe(true);
   });
 
+  it("detects monetary amounts like $150K", () => {
+    const signals = analyzeQuerySignals("What costs $150K?");
+    expect(signals.hasNumbers).toBe(true);
+  });
+
+  it("detects abbreviated amounts like 2.5M", () => {
+    const signals = analyzeQuerySignals("The budget is 2.5M total");
+    expect(signals.hasNumbers).toBe(true);
+  });
+
+  it("detects quarter references like Q3", () => {
+    const signals = analyzeQuerySignals("What is the Q3 delivery date?");
+    expect(signals.hasNumbers).toBe(true);
+  });
+
   it("detects proper nouns", () => {
     const signals = analyzeQuerySignals("What did Microsoft propose?");
     expect(signals.hasProperNouns).toBe(true);
