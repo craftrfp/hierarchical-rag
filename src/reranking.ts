@@ -34,7 +34,11 @@ export function calculateTermFrequency(text: string, terms: string[]): number {
 
   for (const term of terms) {
     const lowerTerm = term.toLowerCase();
-    const matches = lower.split(lowerTerm).length - 1;
+    const regex = new RegExp(
+      `\\b${lowerTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\b`,
+      "g",
+    );
+    const matches = (lower.match(regex) ?? []).length;
     score += matches / Math.max(lower.length / 100, 1);
   }
 
@@ -119,11 +123,67 @@ export function calculateLevelBonus(
 /**
  * Extract meaningful query terms (filter short/common words).
  */
+const STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "are",
+  "but",
+  "not",
+  "you",
+  "all",
+  "can",
+  "her",
+  "was",
+  "one",
+  "our",
+  "out",
+  "has",
+  "have",
+  "had",
+  "how",
+  "its",
+  "may",
+  "who",
+  "did",
+  "get",
+  "got",
+  "let",
+  "say",
+  "she",
+  "too",
+  "use",
+  "what",
+  "when",
+  "where",
+  "which",
+  "why",
+  "will",
+  "with",
+  "this",
+  "that",
+  "from",
+  "they",
+  "been",
+  "were",
+  "being",
+  "does",
+  "done",
+  "each",
+  "than",
+  "then",
+  "them",
+  "these",
+  "those",
+  "about",
+]);
+
 export function extractQueryTerms(query: string): string[] {
   return query
     .toLowerCase()
+    .replace(/[^\w\s]/g, "")
     .split(/\s+/)
-    .filter((t) => t.length > 2);
+    .filter((t) => t.length > 2 && !STOP_WORDS.has(t));
 }
 
 /**

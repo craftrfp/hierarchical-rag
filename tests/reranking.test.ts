@@ -30,11 +30,27 @@ function makeHChunk(
 }
 
 describe("extractQueryTerms", () => {
-  it("filters short words", () => {
+  it("filters short words and stop words", () => {
     const terms = extractQueryTerms("What is the budget for it?");
-    // "it?" has 3 chars so it passes the > 2 filter
-    expect(terms).toEqual(["what", "the", "budget", "for", "it?"]);
+    expect(terms).toEqual(["budget"]);
     expect(terms).not.toContain("is");
+  });
+
+  it("strips punctuation from query terms", () => {
+    const terms = extractQueryTerms("What is the budget? And timeline!");
+    expect(terms).not.toContain("budget?");
+    expect(terms).toContain("budget");
+    expect(terms).not.toContain("timeline!");
+    expect(terms).toContain("timeline");
+  });
+
+  it("filters common stop words", () => {
+    const terms = extractQueryTerms("What is the budget for the project?");
+    expect(terms).not.toContain("what");
+    expect(terms).not.toContain("the");
+    expect(terms).not.toContain("for");
+    expect(terms).toContain("budget");
+    expect(terms).toContain("project");
   });
 
   it("returns empty for very short query", () => {
@@ -52,6 +68,12 @@ describe("calculateTermFrequency", () => {
 
   it("returns 0 for no matches", () => {
     expect(calculateTermFrequency("hello world", ["zebra"])).toBe(0);
+  });
+
+  it("does not count substring matches (e.g., 'cat' in 'concatenate')", () => {
+    const text = "concatenate the data and catalog the results";
+    const score = calculateTermFrequency(text, ["cat"]);
+    expect(score).toBe(0);
   });
 });
 
