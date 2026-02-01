@@ -211,39 +211,31 @@ ChunkLevel.DOCUMENT; // 2 — Document summary
 
 ## How It Works
 
-```
-                          ┌─────────────────┐
-                          │  User Query      │
-                          └────────┬────────┘
-                                   │
-                          ┌────────▼────────┐
-                          │ classifyQuery()  │
-                          │ broad/specific/  │
-                          │ moderate         │
-                          └────────┬────────┘
-                                   │
-                    ┌──────────────▼──────────────┐
-                    │   Vector Search              │
-                    │   (your existing DB)          │
-                    │   Returns leaves + summaries  │
-                    └──────────────┬──────────────┘
-                                   │
-                    ┌──────────────▼──────────────┐
-                    │   rerankWithLevels()          │
-                    │   Level bonus based on        │
-                    │   query classification         │
-                    └──────────────┬──────────────┘
-                                   │
-                    ┌──────────────▼──────────────┐
-                    │   expandSummaryChunks()       │
-                    │   Insert child details         │
-                    │   alongside summaries          │
-                    └──────────────┬──────────────┘
-                                   │
-                          ┌────────▼────────┐
-                          │  LLM Context     │
-                          │  (rich + precise) │
-                          └─────────────────┘
+```mermaid
+flowchart TD
+    A["User Query"]
+    B["classifyQuery()
+    broad / specific / moderate"]
+    C["Vector Search
+    (your existing DB)
+    Returns leaves + summaries"]
+    D["rerankWithLevels()
+    Level bonus based on
+    query classification"]
+    E["expandSummaryChunks()
+    Insert child details
+    alongside summaries"]
+    F["LLM Context
+    (rich + precise)"]
+
+    A --> B --> C --> D --> E --> F
+
+    style A fill:#4f46e5,stroke:#4338ca,color:#fff
+    style B fill:#7c3aed,stroke:#6d28d9,color:#fff
+    style C fill:#2563eb,stroke:#1d4ed8,color:#fff
+    style D fill:#7c3aed,stroke:#6d28d9,color:#fff
+    style E fill:#7c3aed,stroke:#6d28d9,color:#fff
+    style F fill:#059669,stroke:#047857,color:#fff
 ```
 
 ## Storage
