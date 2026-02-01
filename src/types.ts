@@ -44,6 +44,7 @@ export interface SummaryNode {
   sectionHeader: string | null;
   title: string | null;
   childrenChunkIds: string[];
+  parentChunkId?: string | null;
   metadata: Record<string, unknown>;
   embedding: number[];
 }

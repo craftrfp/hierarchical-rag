@@ -216,4 +216,21 @@ describe("createSummarizationPipeline", () => {
     );
     expect(result.documentSummary?.metadata).toHaveProperty("sourceSections");
   });
+
+  it("populates document summary metadata with sectionSummaryCount", async () => {
+    const pipeline = createSummarizationPipeline({
+      llm: makeMockLLM(),
+      embedder: makeMockEmbedder(),
+    });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test RFP");
+    expect(result.documentSummary).not.toBeNull();
+    expect(result.documentSummary!.metadata).toHaveProperty(
+      "sectionSummaryCount",
+      2,
+    );
+  });
 });

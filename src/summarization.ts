@@ -138,6 +138,7 @@ async function summarizeDocument(
     childrenChunkIds: [],
     metadata: {
       childCount: sectionSummaries.length,
+      sectionSummaryCount: sectionSummaries.length,
       sourceSections: sectionSummaries
         .map((s) => s.sectionHeader)
         .filter(Boolean),
