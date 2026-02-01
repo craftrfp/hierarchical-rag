@@ -249,4 +249,22 @@ describe("createSummarizationPipeline", () => {
     expect(result.sectionSummaries[1].chunkIndex).toBe(1);
     expect(result.documentSummary!.chunkIndex).toBe(0);
   });
+
+  it("handles empty LLM response gracefully", async () => {
+    const llm: LLMProvider = { summarize: vi.fn().mockResolvedValue("   ") };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "1", sectionHeader: "Budget", chunkIndex: 0 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries).toHaveLength(1);
+    expect(result.sectionSummaries[0].content.trim().length).toBeGreaterThan(
+      0,
+    );
+    expect(result.sectionSummaries[0].metadata).toHaveProperty(
+      "summaryFallback",
+      true,
+    );
+  });
 });

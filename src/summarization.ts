@@ -98,12 +98,17 @@ async function summarizeSection(
     maxWords,
   );
   const summaryText = await llm.summarize(prompt);
-  const embedding = await embedder.embed(summaryText);
+  const trimmedSummary = summaryText.trim();
+  const isFallback = trimmedSummary.length === 0;
+  const finalSummary = isFallback
+    ? `Summary of ${group.sectionHeader}: ${group.chunks.length} chunks.`
+    : trimmedSummary;
+  const embedding = await embedder.embed(finalSummary);
 
   const firstChunk = group.chunks[0];
 
   return {
-    content: summaryText,
+    content: finalSummary,
     chunkLevel: 1 as ChunkLevel,
     chunkIndex: sectionIndex,
     sectionHeader: group.sectionHeader,
@@ -111,7 +116,8 @@ async function summarizeSection(
     childrenChunkIds: group.chunks.map((c) => c.id),
     metadata: {
       childCount: group.chunks.length,
-      summaryWordCount: summaryText.split(/\s+/).length,
+      summaryWordCount: finalSummary.split(/\s+/).length,
+      summaryFallback: isFallback,
     },
     embedding,
   };
@@ -136,10 +142,15 @@ async function summarizeDocument(
 
   const prompt = buildDocumentPrompt(concatenated, title, maxWords);
   const summaryText = await llm.summarize(prompt);
-  const embedding = await embedder.embed(summaryText);
+  const trimmedSummary = summaryText.trim();
+  const isFallback = trimmedSummary.length === 0;
+  const finalSummary = isFallback
+    ? `Document summary: ${sectionSummaries.length} sections.`
+    : trimmedSummary;
+  const embedding = await embedder.embed(finalSummary);
 
   return {
-    content: summaryText,
+    content: finalSummary,
     chunkLevel: 2 as ChunkLevel,
     chunkIndex: 0,
     sectionHeader: null,
@@ -151,7 +162,8 @@ async function summarizeDocument(
       sourceSections: sectionSummaries
         .map((s) => s.sectionHeader)
         .filter(Boolean),
-      summaryWordCount: summaryText.split(/\s+/).length,
+      summaryWordCount: finalSummary.split(/\s+/).length,
+      summaryFallback: isFallback,
     },
     embedding,
   };
