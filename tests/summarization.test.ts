@@ -233,4 +233,20 @@ describe("createSummarizationPipeline", () => {
       2,
     );
   });
+
+  it("assigns sequential chunkIndex to section summaries", async () => {
+    const pipeline = createSummarizationPipeline({
+      llm: makeMockLLM(),
+      embedder: makeMockEmbedder(),
+    });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Budget", chunkIndex: 1 }),
+      makeChunk({ id: "c", sectionHeader: "Timeline", chunkIndex: 2 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries[0].chunkIndex).toBe(0);
+    expect(result.sectionSummaries[1].chunkIndex).toBe(1);
+    expect(result.documentSummary!.chunkIndex).toBe(0);
+  });
 });

@@ -41,6 +41,7 @@ export interface HierarchicalChunk extends LeafChunk {
 export interface SummaryNode {
   content: string;
   chunkLevel: ChunkLevel;
+  chunkIndex: number;
   sectionHeader: string | null;
   title: string | null;
   childrenChunkIds: string[];

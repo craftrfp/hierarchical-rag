@@ -82,6 +82,7 @@ async function summarizeSection(
   llm: LLMProvider,
   embedder: EmbeddingProvider,
   maxWords: number,
+  sectionIndex: number,
 ): Promise<SummaryNode> {
   const concatenated = group.chunks.map((c) => c.content).join("\n\n");
 
@@ -98,6 +99,7 @@ async function summarizeSection(
   return {
     content: summaryText,
     chunkLevel: 1 as ChunkLevel,
+    chunkIndex: sectionIndex,
     sectionHeader: group.sectionHeader,
     title: firstChunk?.title ?? null,
     childrenChunkIds: group.chunks.map((c) => c.id),
@@ -133,6 +135,7 @@ async function summarizeDocument(
   return {
     content: summaryText,
     chunkLevel: 2 as ChunkLevel,
+    chunkIndex: 0,
     sectionHeader: null,
     title,
     childrenChunkIds: [],
@@ -193,6 +196,7 @@ export function createSummarizationPipeline(config: SummarizationConfig) {
           config.llm,
           config.embedder,
           maxSectionWords,
+          sectionSummaries.length,
         );
         sectionSummaries.push(summary);
       }
