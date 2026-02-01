@@ -105,8 +105,9 @@ describe("createSummarizationPipeline", () => {
     // LLM called: 2 sections + 1 document = 3
     expect(llm.summarize).toHaveBeenCalledTimes(3);
 
-    // Embedder called: 2 section embeds + 1 document embed = 3
-    expect(embedder.embed).toHaveBeenCalledTimes(3);
+    // Embedder called: 1 section embed batch + 1 document embed
+    expect(embedder.embedBatch).toHaveBeenCalledTimes(1);
+    expect(embedder.embed).toHaveBeenCalledTimes(1);
   });
 
   it("returns empty result for empty chunks", async () => {
@@ -287,6 +288,20 @@ describe("createSummarizationPipeline", () => {
     const result = await pipeline.generateHierarchy(chunks, "Test");
     expect(result.sectionSummaries.length).toBeGreaterThanOrEqual(2);
     expect(result.documentSummary).not.toBeNull();
+  });
+
+  it("uses embedBatch for section summary embeddings", async () => {
+    const llm = makeMockLLM();
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+      makeChunk({ id: "c", sectionHeader: "Team", chunkIndex: 2 }),
+    ];
+    await pipeline.generateHierarchy(chunks, "Test");
+    expect(embedder.embedBatch).toHaveBeenCalledTimes(1);
+    expect(embedder.embed).toHaveBeenCalledTimes(1);
   });
 
   it("returns partial results when document summary fails", async () => {

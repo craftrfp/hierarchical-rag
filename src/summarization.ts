@@ -86,7 +86,6 @@ export function groupChunksBySections(chunks: LeafChunk[]): SectionGroup[] {
 async function summarizeSection(
   group: SectionGroup,
   llm: LLMProvider,
-  embedder: EmbeddingProvider,
   maxWords: number,
   sectionIndex: number,
 ): Promise<SummaryNode> {
@@ -103,7 +102,6 @@ async function summarizeSection(
   const finalSummary = isFallback
     ? `Summary of ${group.sectionHeader}: ${group.chunks.length} chunks.`
     : trimmedSummary;
-  const embedding = await embedder.embed(finalSummary);
 
   const firstChunk = group.chunks[0];
 
@@ -119,7 +117,7 @@ async function summarizeSection(
       summaryWordCount: finalSummary.split(/\s+/).length,
       summaryFallback: isFallback,
     },
-    embedding,
+    embedding: [],
   };
 }
 
@@ -213,13 +211,21 @@ export function createSummarizationPipeline(config: SummarizationConfig) {
           const summary = await summarizeSection(
             section,
             config.llm,
-            config.embedder,
             maxSectionWords,
             sectionSummaries.length,
           );
           sectionSummaries.push(summary);
         } catch {
           continue;
+        }
+      }
+
+      if (sectionSummaries.length > 0) {
+        const embeddings = await config.embedder.embedBatch(
+          sectionSummaries.map((summary) => summary.content),
+        );
+        for (let i = 0; i < sectionSummaries.length; i++) {
+          sectionSummaries[i].embedding = embeddings[i] ?? [];
         }
       }
 
