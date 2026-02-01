@@ -212,6 +212,12 @@ describe("rerankWithLevels", () => {
     expect(typeof result[0].rerankScore).toBe("number");
   });
 
+  it("clamps negative base scores to 0", () => {
+    const chunk = makeHChunk({ id: "1", score: -0.5 });
+    const result = rerankWithLevels([chunk], "budget");
+    expect(result[0].rerankScore).toBeGreaterThanOrEqual(0);
+  });
+
   it("handles empty query terms gracefully", () => {
     const chunks = [makeHChunk({ id: "1" })];
     const result = rerankWithLevels(chunks, "a b");

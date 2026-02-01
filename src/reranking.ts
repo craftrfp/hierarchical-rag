@@ -208,7 +208,7 @@ export function rerankWithLevels(
   const classification = classifyQuery(query);
 
   const scored: RankedChunk[] = chunks.map((chunk) => {
-    const base = Math.min(chunk.score, 1);
+    const base = Math.max(0, Math.min(chunk.score, 1));
     const tf = calculateTermFrequency(chunk.content, queryTerms);
     const position = calculatePositionScore(chunk.content, queryTerms);
     const title = calculateTitleBonus(chunk.title, queryTerms);
