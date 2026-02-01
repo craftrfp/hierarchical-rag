@@ -56,7 +56,7 @@ describe("groupChunksBySections", () => {
     expect(groups[1].chunks).toHaveLength(1);
   });
 
-  it("groups chunks without section header under __ungrouped__", () => {
+  it("groups chunks without section header under General", () => {
     const chunks = [
       makeChunk({ id: "1", sectionHeader: null, chunkIndex: 0 }),
       makeChunk({ id: "2", sectionHeader: "Budget", chunkIndex: 1 }),
@@ -65,8 +65,17 @@ describe("groupChunksBySections", () => {
     const groups = groupChunksBySections(chunks);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0].sectionHeader).toBe("__ungrouped__");
+    expect(groups[0].sectionHeader).toBe("General");
     expect(groups[1].sectionHeader).toBe("Budget");
+  });
+
+  it("handles section header that matches old sentinel value", () => {
+    const chunks = [
+      makeChunk({ id: "1", sectionHeader: "__ungrouped__", chunkIndex: 0 }),
+      makeChunk({ id: "2", sectionHeader: null, chunkIndex: 1 }),
+    ];
+    const groups = groupChunksBySections(chunks);
+    expect(groups).toHaveLength(2);
   });
 
   it("preserves chunk order within groups", () => {
@@ -196,6 +205,28 @@ describe("createSummarizationPipeline", () => {
     const docCall = (llm.summarize as ReturnType<typeof vi.fn>).mock
       .calls[1][0] as string;
     expect(docCall).toContain("300 words");
+  });
+
+  it("truncates very long section content before summarization", async () => {
+    let capturedPrompt = "";
+    const llm: LLMProvider = {
+      summarize: vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve("Summary text.");
+      }),
+    };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const longChunks = Array.from({ length: 80 }, (_, i) =>
+      makeChunk({
+        id: `chunk-${i}`,
+        content: "A".repeat(2000),
+        sectionHeader: "Budget",
+        chunkIndex: i,
+      }),
+    );
+    await pipeline.generateHierarchy(longChunks, "Test");
+    expect(capturedPrompt.length).toBeLessThan(120000);
   });
 
   it("includes metadata in summaries", async () => {

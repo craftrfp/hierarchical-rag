@@ -19,6 +19,7 @@ import type {
 
 const DEFAULT_MAX_SECTION_WORDS = 400;
 const DEFAULT_MAX_DOCUMENT_WORDS = 600;
+const MAX_SECTION_CONTENT_CHARS = 100_000;
 
 function buildSectionPrompt(
   sectionHeader: string,
@@ -58,14 +59,14 @@ function buildDocumentPrompt(
 
 /**
  * Group leaf chunks by their section header.
- * Chunks without a section header are grouped under "__ungrouped__".
+ * Chunks without a section header are grouped under "General".
  */
 export function groupChunksBySections(chunks: LeafChunk[]): SectionGroup[] {
   const sorted = [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
   const groups = new Map<string, LeafChunk[]>();
 
   for (const chunk of sorted) {
-    const key = chunk.sectionHeader ?? "__ungrouped__";
+    const key = chunk.sectionHeader ?? "";
     const existing = groups.get(key);
     if (existing) {
       existing.push(chunk);
@@ -75,7 +76,7 @@ export function groupChunksBySections(chunks: LeafChunk[]): SectionGroup[] {
   }
 
   return Array.from(groups.entries()).map(([header, sectionChunks]) => ({
-    sectionHeader: header,
+    sectionHeader: header || "General",
     chunks: sectionChunks,
   }));
 }
@@ -89,7 +90,12 @@ async function summarizeSection(
   maxWords: number,
   sectionIndex: number,
 ): Promise<SummaryNode> {
-  const concatenated = group.chunks.map((c) => c.content).join("\n\n");
+  let concatenated = group.chunks.map((c) => c.content).join("\n\n");
+  if (concatenated.length > MAX_SECTION_CONTENT_CHARS) {
+    concatenated =
+      concatenated.slice(0, MAX_SECTION_CONTENT_CHARS) +
+      "\n\n[Content truncated]";
+  }
 
   const prompt = buildSectionPrompt(
     group.sectionHeader,
@@ -190,7 +196,7 @@ export function createSummarizationPipeline(config: SummarizationConfig) {
      * Generate hierarchical summaries from leaf chunks.
      *
      * Returns section-level summaries (level 1) and a document summary (level 2).
-     * If there are fewer than 2 sections, only a document summary is generated.
+     * Generates section summaries for all sections, plus a document summary if any sections exist.
      */
     async generateHierarchy(
       leafChunks: LeafChunk[],
