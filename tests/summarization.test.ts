@@ -267,4 +267,45 @@ describe("createSummarizationPipeline", () => {
       true,
     );
   });
+
+  it("continues generating summaries when one section fails", async () => {
+    let callCount = 0;
+    const llm: LLMProvider = {
+      summarize: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.reject(new Error("LLM rate limit"));
+        return Promise.resolve("Summary text.");
+      }),
+    };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+      makeChunk({ id: "c", sectionHeader: "Team", chunkIndex: 2 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries.length).toBeGreaterThanOrEqual(2);
+    expect(result.documentSummary).not.toBeNull();
+  });
+
+  it("returns partial results when document summary fails", async () => {
+    let callCount = 0;
+    const llm: LLMProvider = {
+      summarize: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 3) return Promise.reject(new Error("LLM error"));
+        return Promise.resolve("Summary text.");
+      }),
+    };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries).toHaveLength(2);
+    expect(result.documentSummary).toBeNull();
+  });
 });

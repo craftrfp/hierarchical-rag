@@ -209,26 +209,34 @@ export function createSummarizationPipeline(config: SummarizationConfig) {
       const sectionSummaries: SummaryNode[] = [];
       for (const section of sections) {
         if (section.chunks.length === 0) continue;
-        const summary = await summarizeSection(
-          section,
-          config.llm,
-          config.embedder,
-          maxSectionWords,
-          sectionSummaries.length,
-        );
-        sectionSummaries.push(summary);
+        try {
+          const summary = await summarizeSection(
+            section,
+            config.llm,
+            config.embedder,
+            maxSectionWords,
+            sectionSummaries.length,
+          );
+          sectionSummaries.push(summary);
+        } catch {
+          continue;
+        }
       }
 
       // Generate document summary from section summaries
       let documentSummary: SummaryNode | null = null;
       if (sectionSummaries.length > 0) {
-        documentSummary = await summarizeDocument(
-          sectionSummaries,
-          title,
-          config.llm,
-          config.embedder,
-          maxDocumentWords,
-        );
+        try {
+          documentSummary = await summarizeDocument(
+            sectionSummaries,
+            title,
+            config.llm,
+            config.embedder,
+            maxDocumentWords,
+          );
+        } catch {
+          documentSummary = null;
+        }
       }
 
       return { sectionSummaries, documentSummary };
