@@ -56,7 +56,7 @@ describe("groupChunksBySections", () => {
     expect(groups[1].chunks).toHaveLength(1);
   });
 
-  it("groups chunks without section header under __ungrouped__", () => {
+  it("groups chunks without section header under General", () => {
     const chunks = [
       makeChunk({ id: "1", sectionHeader: null, chunkIndex: 0 }),
       makeChunk({ id: "2", sectionHeader: "Budget", chunkIndex: 1 }),
@@ -65,8 +65,17 @@ describe("groupChunksBySections", () => {
     const groups = groupChunksBySections(chunks);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0].sectionHeader).toBe("__ungrouped__");
+    expect(groups[0].sectionHeader).toBe("General");
     expect(groups[1].sectionHeader).toBe("Budget");
+  });
+
+  it("handles section header that matches old sentinel value", () => {
+    const chunks = [
+      makeChunk({ id: "1", sectionHeader: "__ungrouped__", chunkIndex: 0 }),
+      makeChunk({ id: "2", sectionHeader: null, chunkIndex: 1 }),
+    ];
+    const groups = groupChunksBySections(chunks);
+    expect(groups).toHaveLength(2);
   });
 
   it("preserves chunk order within groups", () => {
@@ -105,8 +114,9 @@ describe("createSummarizationPipeline", () => {
     // LLM called: 2 sections + 1 document = 3
     expect(llm.summarize).toHaveBeenCalledTimes(3);
 
-    // Embedder called: 2 section embeds + 1 document embed = 3
-    expect(embedder.embed).toHaveBeenCalledTimes(3);
+    // Embedder called: 1 section embed batch + 1 document embed
+    expect(embedder.embedBatch).toHaveBeenCalledTimes(1);
+    expect(embedder.embed).toHaveBeenCalledTimes(1);
   });
 
   it("returns empty result for empty chunks", async () => {
@@ -197,6 +207,28 @@ describe("createSummarizationPipeline", () => {
     expect(docCall).toContain("300 words");
   });
 
+  it("truncates very long section content before summarization", async () => {
+    let capturedPrompt = "";
+    const llm: LLMProvider = {
+      summarize: vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve("Summary text.");
+      }),
+    };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const longChunks = Array.from({ length: 80 }, (_, i) =>
+      makeChunk({
+        id: `chunk-${i}`,
+        content: "A".repeat(2000),
+        sectionHeader: "Budget",
+        chunkIndex: i,
+      }),
+    );
+    await pipeline.generateHierarchy(longChunks, "Test");
+    expect(capturedPrompt.length).toBeLessThan(120000);
+  });
+
   it("includes metadata in summaries", async () => {
     const pipeline = createSummarizationPipeline({
       llm: makeMockLLM(),
@@ -215,5 +247,111 @@ describe("createSummarizationPipeline", () => {
       "summaryWordCount",
     );
     expect(result.documentSummary?.metadata).toHaveProperty("sourceSections");
+  });
+
+  it("populates document summary metadata with sectionSummaryCount", async () => {
+    const pipeline = createSummarizationPipeline({
+      llm: makeMockLLM(),
+      embedder: makeMockEmbedder(),
+    });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test RFP");
+    expect(result.documentSummary).not.toBeNull();
+    expect(result.documentSummary!.metadata).toHaveProperty(
+      "sectionSummaryCount",
+      2,
+    );
+  });
+
+  it("assigns sequential chunkIndex to section summaries", async () => {
+    const pipeline = createSummarizationPipeline({
+      llm: makeMockLLM(),
+      embedder: makeMockEmbedder(),
+    });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Budget", chunkIndex: 1 }),
+      makeChunk({ id: "c", sectionHeader: "Timeline", chunkIndex: 2 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries[0].chunkIndex).toBe(0);
+    expect(result.sectionSummaries[1].chunkIndex).toBe(1);
+    expect(result.documentSummary!.chunkIndex).toBe(0);
+  });
+
+  it("handles empty LLM response gracefully", async () => {
+    const llm: LLMProvider = { summarize: vi.fn().mockResolvedValue("   ") };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "1", sectionHeader: "Budget", chunkIndex: 0 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries).toHaveLength(1);
+    expect(result.sectionSummaries[0].content.trim().length).toBeGreaterThan(
+      0,
+    );
+    expect(result.sectionSummaries[0].metadata).toHaveProperty(
+      "summaryFallback",
+      true,
+    );
+  });
+
+  it("continues generating summaries when one section fails", async () => {
+    let callCount = 0;
+    const llm: LLMProvider = {
+      summarize: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.reject(new Error("LLM rate limit"));
+        return Promise.resolve("Summary text.");
+      }),
+    };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+      makeChunk({ id: "c", sectionHeader: "Team", chunkIndex: 2 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries.length).toBeGreaterThanOrEqual(2);
+    expect(result.documentSummary).not.toBeNull();
+  });
+
+  it("uses embedBatch for section summary embeddings", async () => {
+    const llm = makeMockLLM();
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+      makeChunk({ id: "c", sectionHeader: "Team", chunkIndex: 2 }),
+    ];
+    await pipeline.generateHierarchy(chunks, "Test");
+    expect(embedder.embedBatch).toHaveBeenCalledTimes(1);
+    expect(embedder.embed).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns partial results when document summary fails", async () => {
+    let callCount = 0;
+    const llm: LLMProvider = {
+      summarize: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 3) return Promise.reject(new Error("LLM error"));
+        return Promise.resolve("Summary text.");
+      }),
+    };
+    const embedder = makeMockEmbedder();
+    const pipeline = createSummarizationPipeline({ llm, embedder });
+    const chunks = [
+      makeChunk({ id: "a", sectionHeader: "Budget", chunkIndex: 0 }),
+      makeChunk({ id: "b", sectionHeader: "Timeline", chunkIndex: 1 }),
+    ];
+    const result = await pipeline.generateHierarchy(chunks, "Test");
+    expect(result.sectionSummaries).toHaveLength(2);
+    expect(result.documentSummary).toBeNull();
   });
 });

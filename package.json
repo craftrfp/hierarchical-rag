@@ -1,9 +1,17 @@
 {
   "name": "@craftrfp/hierarchical-rag",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-agnostic hierarchical RAG with RAPTOR-style summary nodes",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
